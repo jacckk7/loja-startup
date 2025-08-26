@@ -1,67 +1,132 @@
-# Payload Blank Template
+# Loja Startup
 
-This template comes configured with the bare minimum to get started on anything you need.
+## Como rodar o projeto do zero
 
-## Quick start
+### 1. Configuração do ambiente
 
-This template can be deployed directly from our Cloud hosting and it will setup MongoDB and cloud S3 object storage for media.
+- **Clone o repositório**:
+  ```bash
+  git clone https://github.com/jacckk7/loja-startup.git
+  cd loja-startup
+  ```
 
-## Quick Start - local setup
+- **Crie o arquivo `.env`**:
+  Copie o exemplo:
+  ```bash
+  cp .env.example .env
+  ```
+  Edite o arquivo `.env` e configure a variável `DATABASE_URI` com a URI do seu MongoDB, por exemplo:
+  ```
+  DATABASE_URI=mongodb://127.0.0.1/loja-db
+  PAYLOAD_SECRET=uma_senha_segura
+  ```
 
-To spin up this template locally, follow these steps:
+- **Instale os módulos do Node**:
+  ```bash
+  pnpm install
+  ```
+  ou
+  ```bash
+  npm install
+  ```
 
-### Clone
+- **Rode o projeto**:
+  ```bash
+  pnpm dev
+  ```
+  ou
+  ```bash
+  npm run dev
+  ```
+  Acesse `http://localhost:3000` no navegador.
 
-After you click the `Deploy` button above, you'll want to have standalone copy of this repo on your machine. If you've already cloned this repo, skip to [Development](#development).
+### 2. Criando um usuário admin
 
-### Development
+- Ao acessar a aplicação pela primeira vez, será exibida a tela de login/cadastro.
+- Crie o primeiro usuário pelo painel de administração, preenchendo os campos obrigatórios.
+- O primeiro usuário criado será o admin e terá acesso total ao painel.
 
-1. First [clone the repo](#clone) if you have not done so already
-2. `cd my-project && cp .env.example .env` to copy the example environment variables. You'll need to add the `MONGODB_URI` from your Cloud project to your `.env` if you want to use S3 storage and the MongoDB database that was created for you.
+---
 
-3. `pnpm install && pnpm dev` to install dependencies and start the dev server
-4. open `http://localhost:3000` to open the app in your browser
+## Explicação detalhada das collections
 
-That's it! Changes made in `./src` will be reflected in your app. Follow the on-screen instructions to login and create your first admin user. Then check out [Production](#production) once you're ready to build and serve your app, and [Deployment](#deployment) when you're ready to go live.
+### Produtos
 
-#### Docker (Optional)
+Arquivo: [`src/collections/Produtos.ts`](src/collections/Produtos.ts)
 
-If you prefer to use Docker for local development instead of a local MongoDB instance, the provided docker-compose.yml file can be used.
+**Campos:**
+- `nome` (string, obrigatório): Nome do produto.
+- `descricao` (string, opcional): Descrição detalhada.
+- `preco` (number, obrigatório): Preço do produto.
+- `estoque` (number, obrigatório, default: 0): Quantidade disponível em estoque.
 
-To do so, follow these steps:
+**Hooks:**  
+Não há hooks customizados na collection Produtos.
 
-- Modify the `MONGODB_URI` in your `.env` file to `mongodb://127.0.0.1/<dbname>`
-- Modify the `docker-compose.yml` file's `MONGODB_URI` to match the above `<dbname>`
-- Run `docker-compose up` to start the database, optionally pass `-d` to run in the background.
+**Exemplo de documento:**
+```json
+{
+  "id": "abc123",
+  "nome": "Camiseta",
+  "descricao": "Camiseta 100% algodão",
+  "preco": 49.90,
+  "estoque": 10,
+  "createdAt": "...",
+  "updatedAt": "..."
+}
+```
 
-## How it works
+**Rotas CRUD:**
+- **GET** `/api/produtos` — Lista todos os produtos.
+- **GET** `/api/produtos/:id` — Busca um produto pelo ID.
+- **POST** `/api/produtos` — Cria um novo produto.
+- **PUT/PATCH** `/api/produtos/:id` — Atualiza um produto.
+- **DELETE** `/api/produtos/:id` — Remove um produto.
 
-The Payload config is tailored specifically to the needs of most websites. It is pre-configured in the following ways:
+---
 
-### Collections
+### Transações
 
-See the [Collections](https://payloadcms.com/docs/configuration/collections) docs for details on how to extend this functionality.
+Arquivo: [`src/collections/Transacoes.ts`](src/collections/Transacoes.ts)
 
-- #### Users (Authentication)
+**Campos:**
+- `produto` (relationship, obrigatório): Referência ao produto vendido.
+- `quantidade` (number, obrigatório, default: 1): Quantidade vendida.
+- `data` (date, obrigatório, default: data atual): Data da transação.
 
-  Users are auth-enabled collections that have access to the admin panel.
+**Hooks:**
+- **beforeChange**:  
+  - Ao criar uma transação, verifica se há estoque suficiente do produto. Se não houver, lança erro.
+  - Ao atualizar, verifica se o aumento de quantidade não excede o estoque disponível.
+- **afterChange**:  
+  - Ao criar, diminui o estoque do produto conforme a quantidade vendida.
+  - Ao atualizar, ajusta o estoque conforme a diferença entre a quantidade antiga e a nova.
+- **afterDelete**:  
+  - Ao deletar uma transação, devolve o estoque do produto referente à quantidade removida.
 
-  For additional help, see the official [Auth Example](https://github.com/payloadcms/payload/tree/main/examples/auth) or the [Authentication](https://payloadcms.com/docs/authentication/overview#authentication-overview) docs.
+**Exemplo de documento:**
+```json
+{
+  "id": "trans123",
+  "produto": "abc123",
+  "quantidade": 2,
+  "data": "2025-08-26T12:00:00.000Z",
+  "createdAt": "...",
+  "updatedAt": "..."
+}
+```
 
-- #### Media
+**Rotas CRUD:**
+- **GET** `/api/transacoes` — Lista todas as transações.
+- **GET** `/api/transacoes/:id` — Busca uma transação pelo ID.
+- **POST** `/api/transacoes` — Cria uma nova transação (verifica estoque).
+- **PUT/PATCH** `/api/transacoes/:id` — Atualiza uma transação (ajusta estoque).
+- **DELETE** `/api/transacoes/:id` — Remove uma transação (devolve estoque).
 
-  This is the uploads enabled collection. It features pre-configured sizes, focal point and manual resizing to help you manage your pictures.
+---
 
-### Docker
+## Observações
 
-Alternatively, you can use [Docker](https://www.docker.com) to spin up this template locally. To do so, follow these steps:
-
-1. Follow [steps 1 and 2 from above](#development), the docker-compose file will automatically use the `.env` file in your project root
-1. Next run `docker-compose up`
-1. Follow [steps 4 and 5 from above](#development) to login and create your first admin user
-
-That's it! The Docker instance will help you get up and running quickly while also standardizing the development environment across your teams.
-
-## Questions
-
-If you have any issues or questions, reach out to us on [Discord](https://discord.com/invite/payload) or start a [GitHub discussion](https://github.com/payloadcms/payload/discussions).
+- Todas as rotas REST seguem o padrão `/api/[collection]`.
+- O projeto também suporta GraphQL em `/api/graphql`.
+- O painel admin está disponível em `/admin`.
